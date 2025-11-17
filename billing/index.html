@@ -310,6 +310,22 @@
             padding: 8px 0;
         }
 
+        .total-row .paid-input {
+            width: 160px;
+            padding: 8px 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 1rem;
+            text-align: right;
+            direction: ltr;
+        }
+
+        .total-row .paid-input:focus {
+            outline: none;
+            border-color: var(--secondary-color);
+            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+        }
+
         .total-row.total {
             font-weight: bold;
             font-size: 1.1rem;
@@ -504,7 +520,7 @@
                 </div>
                 <div class="total-row">
                     <span>المبلغ المدفوع:</span>
-                    <span id="paidValue">0.00 د.ع</span>
+                    <input type="number" id="paidInput" class="paid-input" value="0.00" step="0.01" min="0" dir="ltr">
                 </div>
                 <div class="total-row total">
                     <span>الباقي:</span>
@@ -745,6 +761,22 @@
             
             // Checkout button
             document.getElementById('checkoutBtn').addEventListener('click', checkoutBill);
+
+            // Paid amount input
+            const paidInput = document.getElementById('paidInput');
+            paidInput.addEventListener('focus', function() {
+                currentInputField = this;
+                currentInputValue = this.value;
+            });
+            paidInput.addEventListener('input', function() {
+                currentInputField = this;
+                currentInputValue = this.value;
+                updatePaidAmount(this.value);
+            });
+            paidInput.addEventListener('blur', function() {
+                currentInputField = null;
+                currentInputValue = '';
+            });
             
             // Numpad buttons
             document.querySelectorAll('.numpad button').forEach(button => {
@@ -1218,7 +1250,8 @@
             paidAmount = parseFloat(amount) || 0;
             balance = total - paidAmount;
             
-            document.getElementById('paidValue').textContent = paidAmount.toFixed(2) + ' د.ع';
+            const paidInput = document.getElementById('paidInput');
+            paidInput.value = paidAmount.toFixed(2);
             document.getElementById('balanceValue').textContent = balance.toFixed(2) + ' د.ع';
             
             // Update print values as well
@@ -1343,6 +1376,7 @@
             currentInputValue = '';
             
             updateBillDisplay();
+            document.getElementById('paidInput').value = '0.00';
             document.getElementById('barcodeInput').focus();
             
             // Hide print bill
