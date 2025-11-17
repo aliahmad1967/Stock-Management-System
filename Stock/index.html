@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام إدارة المخزون</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --accent-color: #e74c3c;
+            --light-color: #ecf0f1;
+            --dark-color: #2c3e50;
+            --success-color: #2ecc71;
+            --warning-color: #f39c12;
+            --border-radius: 8px;
+            --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+            direction: rtl;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 20px 0;
+            border-radius: var(--border-radius);
+            margin-bottom: 30px;
+            text-align: center;
+            box-shadow: var(--box-shadow);
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            margin-bottom: 10px;
+        }
+
+        .actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .search-box {
+            flex: 1;
+            max-width: 500px;
+            position: relative;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 12px 45px 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            transition: var(--transition);
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--secondary-color);
+            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+        }
+
+        .search-box i {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #777;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #2980b9;
+            transform: translateY(-2px);
+        }
+
+        .btn-success {
+            background-color: var(--success-color);
+            color: white;
+        }
+
+        .btn-warning {
+            background-color: var(--warning-color);
+            color: white;
+        }
+
+        .btn-danger {
+            background-color: var(--accent-color);
+            color: white;
+        }
+
+        .btn-sm {
+            padding: 8px 16px;
+            font-size: 0.9rem;
+        }
+
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: white;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            box-shadow: var(--box-shadow);
+        }
+
+        .items-table th,
+        .items-table td {
+            padding: 15px;
+            text-align: right;
+            border-bottom: 1px solid #eee;
+        }
+
+        .items-table th {
+            background-color: var(--primary-color);
+            color: white;
+            font-weight: 600;
+        }
+
+        .items-table tr:hover {
+            background-color: #f9f9f9;
+        }
+
+        .items-table img {
+            width: 50px;
+            height: 50px;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+
+        .no-items {
+            text-align: center;
+            padding: 40px;
+            color: #777;
+            font-size: 1.1rem;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-content {
+            background-color: white;
+            border-radius: var(--border-radius);
+            width: 100%;
+            max-width: 600px;
+            max-height: 90vh;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            animation: modalFadeIn 0.3s ease;
+        }
+
+        @keyframes modalFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .close-btn:hover {
+            color: #ecf0f1;
+        }
+
+        .modal-body {
+            padding: 25px;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--dark-color);
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            transition: var(--transition);
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--secondary-color);
+            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+        }
+
+        .form-row {
+            display: flex;
+            gap: 15px;
+        }
+
+        .form-row .form-group {
+            flex: 1;
+        }
+
+        .modal-footer {
+            padding: 20px;
+            background-color: #f9f9f9;
+            display: flex;
+            justify-content: flex-start;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .search-box {
+                max-width: 100%;
+            }
+            
+            .form-row {
+                flex-direction: column;
+                gap: 0;
+            }
+            
+            .items-table {
+                display: block;
+                overflow-x: auto;
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+            }
+        }
+
+        .profit {
+            font-weight: bold;
+            color: var(--success-color);
+        }
+
+        .loss {
+            font-weight: bold;
+            color: var(--accent-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>نظام إدارة المخزون</h1>
+            <p>إدارة المنتجات والمخزون بسهولة وكفاءة</p>
+        </header>
+
+        <div class="actions">
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="ابحث عن منتج بالاسم...">
+                <i class="fas fa-search"></i>
+            </div>
+            <button class="btn btn-primary" id="addItemBtn">
+                <i class="fas fa-plus"></i> إضافة منتج جديد
+            </button>
+        </div>
+
+        <div class="table-container">
+            <table class="items-table">
+                <thead>
+                    <tr>
+                        <th>الصورة</th>
+                        <th>الباركود</th>
+                        <th>الاسم</th>
+                        <th>الفئة</th>
+                        <th>التكلفة</th>
+                        <th>السعر</th>
+                        <th>الربح</th>
+                        <th>الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody id="itemsTableBody">
+                    <!-- Items will be populated by JavaScript -->
+                </tbody>
+            </table>
+            <div id="noItemsMessage" class="no-items" style="display: none;">
+                <i class="fas fa-box-open" style="font-size: 3rem; margin-bottom: 15px; color: #ccc;"></i>
+                <p>لا توجد منتجات في المخزون. أضف منتجًا جديدًا للبدء.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Item Modal -->
+    <div class="modal" id="itemModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">إضافة منتج جديد</h2>
+                <button class="close-btn" id="closeModalBtn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="itemForm">
+                    <div class="form-group">
+                        <label for="barcode">الباركود</label>
+                        <input type="text" id="barcode" class="form-control" placeholder="أدخل الباركود (اختياري)">
+                    </div>
+                    <div class="form-group">
+                        <label for="name">اسم المنتج *</label>
+                        <input type="text" id="name" class="form-control" placeholder="أدخل اسم المنتج" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="category">الفئة</label>
+                        <input type="text" id="category" class="form-control" placeholder="أدخل فئة المنتج (اختياري)">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="cost">التكلفة</label>
+                            <input type="number" id="cost" class="form-control" placeholder="التكلفة" step="0.01" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="price">السعر</label>
+                            <input type="number" id="price" class="form-control" placeholder="سعر البيع" step="0.01" min="0">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="image">رابط الصورة</label>
+                        <input type="text" id="image" class="form-control" placeholder="رابط الصورة (اختياري)">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" id="saveItemBtn">حفظ المنتج</button>
+                <button type="button" class="btn" id="cancelBtn">إلغاء</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal" id="deleteModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>تأكيد الحذف</h2>
+                <button class="close-btn" id="closeDeleteModalBtn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="deleteMessage">هل أنت متأكد من حذف هذا المنتج؟ لا يمكن التراجع عن هذا الإجراء.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">نعم، احذف</button>
+                <button type="button" class="btn" id="cancelDeleteBtn">إلغاء</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Database setup
+        const DB_NAME = 'StockDB';
+        const DB_VERSION = 1;
+        const STORE_NAME = 'items';
+        
+        let db;
+        let currentEditId = null;
+        let itemToDelete = null;
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeDB();
+            setupEventListeners();
+        });
+
+        // Initialize IndexedDB
+        function initializeDB() {
+            const request = indexedDB.open(DB_NAME, DB_VERSION);
+            
+            request.onerror = function(event) {
+                console.error('فشل في فتح قاعدة البيانات:', event.target.error);
+            };
+            
+            request.onsuccess = function(event) {
+                db = event.target.result;
+                loadItems();
+            };
+            
+            request.onupgradeneeded = function(event) {
+                const db = event.target.result;
+                
+                // Create object store if it doesn't exist
+                if (!db.objectStoreNames.contains(STORE_NAME)) {
+                    const objectStore = db.createObjectStore(STORE_NAME, { 
+                        keyPath: 'id', 
+                        autoIncrement: true 
+                    });
+                    
+                    // Create indexes for searching
+                    objectStore.createIndex('name', 'name', { unique: false });
+                    objectStore.createIndex('barcode', 'barcode', { unique: false });
+                    objectStore.createIndex('category', 'category', { unique: false });
+                }
+            };
+        }
+
+        // Set up event listeners
+        function setupEventListeners() {
+            // Add item button
+            document.getElementById('addItemBtn').addEventListener('click', openAddModal);
+            
+            // Modal buttons
+            document.getElementById('closeModalBtn').addEventListener('click', closeModal);
+            document.getElementById('cancelBtn').addEventListener('click', closeModal);
+            document.getElementById('saveItemBtn').addEventListener('click', saveItem);
+            
+            // Delete modal buttons
+            document.getElementById('closeDeleteModalBtn').addEventListener('click', closeDeleteModal);
+            document.getElementById('cancelDeleteBtn').addEventListener('click', closeDeleteModal);
+            document.getElementById('confirmDeleteBtn').addEventListener('click', confirmDelete);
+            
+            // Search functionality
+            document.getElementById('searchInput').addEventListener('input', searchItems);
+            
+            // Close modal when clicking outside
+            document.getElementById('itemModal').addEventListener('click', function(event) {
+                if (event.target === this) {
+                    closeModal();
+                }
+            });
+            
+            document.getElementById('deleteModal').addEventListener('click', function(event) {
+                if (event.target === this) {
+                    closeDeleteModal();
+                }
+            });
+        }
+
+        // Open modal for adding new item
+        function openAddModal() {
+            currentEditId = null;
+            document.getElementById('modalTitle').textContent = 'إضافة منتج جديد';
+            document.getElementById('itemForm').reset();
+            document.getElementById('itemModal').style.display = 'flex';
+        }
+
+        // Close modal
+        function closeModal() {
+            document.getElementById('itemModal').style.display = 'none';
+            currentEditId = null;
+        }
+
+        // Close delete confirmation modal
+        function closeDeleteModal() {
+            document.getElementById('deleteModal').style.display = 'none';
+            itemToDelete = null;
+        }
+
+        // Save item to database
+        function saveItem() {
+            const form = document.getElementById('itemForm');
+            
+            // Validate required fields
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+            
+            const item = {
+                barcode: document.getElementById('barcode').value,
+                name: document.getElementById('name').value,
+                category: document.getElementById('category').value,
+                cost: parseFloat(document.getElementById('cost').value) || 0,
+                price: parseFloat(document.getElementById('price').value) || 0,
+                image: document.getElementById('image').value,
+                createdAt: new Date()
+            };
+            
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const objectStore = transaction.objectStore(STORE_NAME);
+            
+            let request;
+            if (currentEditId) {
+                item.id = currentEditId;
+                request = objectStore.put(item);
+            } else {
+                request = objectStore.add(item);
+            }
+            
+            request.onsuccess = function() {
+                closeModal();
+                loadItems();
+                showNotification(currentEditId ? 'تم تحديث المنتج بنجاح' : 'تم إضافة المنتج بنجاح', 'success');
+            };
+            
+            request.onerror = function(event) {
+                console.error('فشل في حفظ المنتج:', event.target.error);
+                showNotification('حدث خطأ أثناء حفظ المنتج. يرجى المحاولة مرة أخرى.', 'error');
+            };
+        }
+
+        // Load items from database
+        function loadItems(searchTerm = '') {
+            const transaction = db.transaction([STORE_NAME], 'readonly');
+            const objectStore = transaction.objectStore(STORE_NAME);
+            const request = objectStore.getAll();
+            
+            request.onsuccess = function(event) {
+                const items = event.target.result;
+                displayItems(items, searchTerm);
+            };
+            
+            request.onerror = function(event) {
+                console.error('فشل في تحميل المنتجات:', event.target.error);
+            };
+        }
+
+        // Display items in the table
+        function displayItems(items, searchTerm = '') {
+            const tableBody = document.getElementById('itemsTableBody');
+            const noItemsMessage = document.getElementById('noItemsMessage');
+            
+            // Filter items if search term is provided
+            if (searchTerm) {
+                searchTerm = searchTerm.toLowerCase();
+                items = items.filter(item => 
+                    item.name.toLowerCase().includes(searchTerm) ||
+                    (item.barcode && item.barcode.toLowerCase().includes(searchTerm)) ||
+                    (item.category && item.category.toLowerCase().includes(searchTerm))
+                );
+            }
+            
+            // Clear table
+            tableBody.innerHTML = '';
+            
+            if (items.length === 0) {
+                tableBody.style.display = 'none';
+                noItemsMessage.style.display = 'block';
+                return;
+            }
+            
+            tableBody.style.display = 'table-row-group';
+            noItemsMessage.style.display = 'none';
+            
+            // Add items to table
+            items.forEach(item => {
+                const row = document.createElement('tr');
+                const profit = item.price - item.cost;
+                const profitClass = profit >= 0 ? 'profit' : 'loss';
+                const profitText = profit >= 0 ? `+${profit.toFixed(2)}` : profit.toFixed(2);
+                
+                row.innerHTML = `
+                    <td>
+                        ${item.image ? 
+                            `<img src="${item.image}" alt="${item.name}" onerror="this.style.display='none'">` : 
+                            '<i class="fas fa-image" style="font-size: 1.5rem; color: #ccc;"></i>'
+                        }
+                    </td>
+                    <td>${item.barcode || '---'}</td>
+                    <td>${item.name}</td>
+                    <td>${item.category || '---'}</td>
+                    <td>${item.cost ? item.cost.toFixed(2) : '0.00'} د.ع</td>
+                    <td>${item.price ? item.price.toFixed(2) : '0.00'} د.ع</td>
+                    <td class="${profitClass}">${profitText} د.ع</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn btn-warning btn-sm edit-btn" data-id="${item.id}">
+                                <i class="fas fa-edit"></i> تعديل
+                            </button>
+                            <button class="btn btn-danger btn-sm delete-btn" data-id="${item.id}">
+                                <i class="fas fa-trash"></i> حذف
+                            </button>
+                        </div>
+                    </td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+            
+            // Add event listeners to edit and delete buttons
+            document.querySelectorAll('.edit-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    const itemId = parseInt(this.getAttribute('data-id'));
+                    editItem(itemId);
+                });
+            });
+            
+            document.querySelectorAll('.delete-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    const itemId = parseInt(this.getAttribute('data-id'));
+                    showDeleteConfirmation(itemId);
+                });
+            });
+        }
+
+        // Edit item
+        function editItem(id) {
+            const transaction = db.transaction([STORE_NAME], 'readonly');
+            const objectStore = transaction.objectStore(STORE_NAME);
+            const request = objectStore.get(id);
+            
+            request.onsuccess = function(event) {
+                const item = event.target.result;
+                if (item) {
+                    currentEditId = id;
+                    document.getElementById('modalTitle').textContent = 'تعديل المنتج';
+                    document.getElementById('barcode').value = item.barcode || '';
+                    document.getElementById('name').value = item.name;
+                    document.getElementById('category').value = item.category || '';
+                    document.getElementById('cost').value = item.cost || '';
+                    document.getElementById('price').value = item.price || '';
+                    document.getElementById('image').value = item.image || '';
+                    document.getElementById('itemModal').style.display = 'flex';
+                }
+            };
+        }
+
+        // Show delete confirmation
+        function showDeleteConfirmation(id) {
+            const transaction = db.transaction([STORE_NAME], 'readonly');
+            const objectStore = transaction.objectStore(STORE_NAME);
+            const request = objectStore.get(id);
+            
+            request.onsuccess = function(event) {
+                const item = event.target.result;
+                if (item) {
+                    itemToDelete = id;
+                    document.getElementById('deleteMessage').textContent = 
+                        `هل أنت متأكد من حذف المنتج "${item.name}"؟ لا يمكن التراجع عن هذا الإجراء.`;
+                    document.getElementById('deleteModal').style.display = 'flex';
+                }
+            };
+        }
+
+        // Confirm and delete item
+        function confirmDelete() {
+            if (itemToDelete) {
+                const transaction = db.transaction([STORE_NAME], 'readwrite');
+                const objectStore = transaction.objectStore(STORE_NAME);
+                const request = objectStore.delete(itemToDelete);
+                
+                request.onsuccess = function() {
+                    closeDeleteModal();
+                    loadItems();
+                    showNotification('تم حذف المنتج بنجاح', 'success');
+                };
+                
+                request.onerror = function(event) {
+                    console.error('فشل في حذف المنتج:', event.target.error);
+                    showNotification('حدث خطأ أثناء حذف المنتج. يرجى المحاولة مرة أخرى.', 'error');
+                };
+            }
+        }
+
+        // Search items
+        function searchItems() {
+            const searchTerm = document.getElementById('searchInput').value;
+            loadItems(searchTerm);
+        }
+
+        // Show notification
+        function showNotification(message, type) {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.textContent = message;
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                left: 20px;
+                padding: 15px 20px;
+                border-radius: var(--border-radius);
+                color: white;
+                font-weight: 600;
+                z-index: 1001;
+                box-shadow: var(--box-shadow);
+                transition: var(--transition);
+                background-color: ${type === 'success' ? 'var(--success-color)' : 'var(--accent-color)'};
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Remove notification after 3 seconds
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                setTimeout(() => {
+                    document.body.removeChild(notification);
+                }, 300);
+            }, 3000);
+        }
+
+        // Add some sample data on first load
+        function addSampleData() {
+            const sampleItems = [
+                {
+                    barcode: '123456789',
+                    name: 'لابتوب ديل',
+                    category: 'إلكترونيات',
+                    cost: 2500,
+                    price: 3200,
+                    image: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=500&q=80',
+                    createdAt: new Date()
+                },
+                {
+                    barcode: '987654321',
+                    name: 'هاتف سامسونج',
+                    category: 'إلكترونيات',
+                    cost: 1800,
+                    price: 2200,
+                    image: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=500&q=80',
+                    createdAt: new Date()
+                },
+                {
+                    barcode: '456123789',
+                    name: 'طابعة كانون',
+                    category: 'معدات مكتبية',
+                    cost: 800,
+                    price: 1100,
+                    image: '',
+                    createdAt: new Date()
+                }
+            ];
+            
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const objectStore = transaction.objectStore(STORE_NAME);
+            
+            // Check if we already have items
+            const countRequest = objectStore.count();
+            
+            countRequest.onsuccess = function() {
+                if (countRequest.result === 0) {
+                    // Add sample items if database is empty
+                    sampleItems.forEach(item => {
+                        objectStore.add(item);
+                    });
+                    
+                    // Reload items to display the sample data
+                    setTimeout(() => {
+                        loadItems();
+                    }, 500);
+                }
+            };
+        }
+
+        // Call addSampleData after database is initialized
+        const originalOnSuccess = initializeDB;
+        initializeDB = function() {
+            const request = indexedDB.open(DB_NAME, DB_VERSION);
+            
+            request.onerror = function(event) {
+                console.error('فشل في فتح قاعدة البيانات:', event.target.error);
+            };
+            
+            request.onsuccess = function(event) {
+                db = event.target.result;
+                loadItems();
+                addSampleData();
+            };
+            
+            request.onupgradeneeded = function(event) {
+                const db = event.target.result;
+                
+                // Create object store if it doesn't exist
+                if (!db.objectStoreNames.contains(STORE_NAME)) {
+                    const objectStore = db.createObjectStore(STORE_NAME, { 
+                        keyPath: 'id', 
+                        autoIncrement: true 
+                    });
+                    
+                    // Create indexes for searching
+                    objectStore.createIndex('name', 'name', { unique: false });
+                    objectStore.createIndex('barcode', 'barcode', { unique: false });
+                    objectStore.createIndex('category', 'category', { unique: false });
+                }
+            };
+        };
+    </script>
+</body>
+</html>
