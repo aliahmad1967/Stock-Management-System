@@ -567,11 +567,18 @@
     </div>
 
     <script>
-        // Database setup
-        const DB_NAME = 'StockDB';
-        const DB_VERSION = 1;
-        const STORE_NAME = 'items';
-        const BILLS_STORE_NAME = 'bills';
+        // Database setup (مشترك مع بقية الصفحات)
+        const DB_NAME = 'InventorySystem';
+        const DB_VERSION = 2;
+        const STORE_NAMES = {
+            PRODUCTS: 'products',
+            BILLS: 'bills',
+            CATEGORIES: 'categories',
+            SETTINGS: 'settings',
+            BACKUPS: 'backups'
+        };
+        const STORE_NAME = STORE_NAMES.PRODUCTS;
+        const BILLS_STORE_NAME = STORE_NAMES.BILLS;
 
         let db;
         let currentCategory = null;
@@ -665,34 +672,48 @@
                 countRequest.onsuccess = function() {
                     billNumber = countRequest.result + 1;
                 };
-                
-                addSampleData();
             };
             
             request.onupgradeneeded = function(event) {
                 const db = event.target.result;
-                
-                // Create items store if it doesn't exist
-                if (!db.objectStoreNames.contains(STORE_NAME)) {
-                    const objectStore = db.createObjectStore(STORE_NAME, { 
-                        keyPath: 'id', 
-                        autoIncrement: true 
+
+                if (!db.objectStoreNames.contains(STORE_NAMES.PRODUCTS)) {
+                    const store = db.createObjectStore(STORE_NAMES.PRODUCTS, {
+                        keyPath: 'id',
+                        autoIncrement: true
                     });
-                    
-                    // Create indexes for searching
-                    objectStore.createIndex('name', 'name', { unique: false });
-                    objectStore.createIndex('barcode', 'barcode', { unique: false });
-                    objectStore.createIndex('category', 'category', { unique: false });
+                    store.createIndex('name', 'name', { unique: false });
+                    store.createIndex('barcode', 'barcode', { unique: true });
+                    store.createIndex('category', 'category', { unique: false });
                 }
-                
-                // Create bills store if it doesn't exist
-                if (!db.objectStoreNames.contains(BILLS_STORE_NAME)) {
-                    const billsStore = db.createObjectStore(BILLS_STORE_NAME, { 
-                        keyPath: 'id', 
-                        autoIncrement: true 
+
+                if (!db.objectStoreNames.contains(STORE_NAMES.BILLS)) {
+                    const store = db.createObjectStore(STORE_NAMES.BILLS, {
+                        keyPath: 'id',
+                        autoIncrement: true
                     });
-                    
-                    billsStore.createIndex('date', 'date', { unique: false });
+                    store.createIndex('date', 'date', { unique: false });
+                    store.createIndex('number', 'number', { unique: true });
+                }
+
+                if (!db.objectStoreNames.contains(STORE_NAMES.CATEGORIES)) {
+                    const store = db.createObjectStore(STORE_NAMES.CATEGORIES, {
+                        keyPath: 'id',
+                        autoIncrement: true
+                    });
+                    store.createIndex('name', 'name', { unique: true });
+                }
+
+                if (!db.objectStoreNames.contains(STORE_NAMES.SETTINGS)) {
+                    db.createObjectStore(STORE_NAMES.SETTINGS, { keyPath: 'key' });
+                }
+
+                if (!db.objectStoreNames.contains(STORE_NAMES.BACKUPS)) {
+                    const store = db.createObjectStore(STORE_NAMES.BACKUPS, {
+                        keyPath: 'id',
+                        autoIncrement: true
+                    });
+                    store.createIndex('date', 'date', { unique: false });
                 }
             };
         }
@@ -1369,111 +1390,6 @@
             }, 3000);
         }
 
-        // Add sample data if database is empty
-        function addSampleData() {
-            const sampleItems = [
-                {
-                    barcode: '123456789',
-                    name: 'لابتوب ديل',
-                    category: 'لابتوبات',
-                    cost: 2500,
-                    price: 3200,
-                    image: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=500&q=80'
-                },
-                {
-                    barcode: '987654321',
-                    name: 'هاتف سامسونج',
-                    category: 'هواتف ذكية',
-                    cost: 1800,
-                    price: 2200,
-                    image: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=500&q=80'
-                },
-                {
-                    barcode: '456123789',
-                    name: 'طابعة كانون',
-                    category: 'طابعات',
-                    cost: 800,
-                    price: 1100,
-                    image: ''
-                },
-                {
-                    barcode: '789123456',
-                    name: 'ماوس لاسلكي',
-                    category: 'إكسسوارات الهواتف',
-                    cost: 50,
-                    price: 80,
-                    image: 'https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=500&q=80'
-                },
-                {
-                    barcode: '321654987',
-                    name: 'لوحة مفاتيح',
-                    category: 'إكسسوارات',
-                    cost: 120,
-                    price: 180,
-                    image: ''
-                },
-                {
-                    barcode: '654987321',
-                    name: 'كرسي مكتب',
-                    category: 'أثاث مكتبي',
-                    cost: 300,
-                    price: 450,
-                    image: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=500&q=80'
-                },
-                {
-                    barcode: '147258369',
-                    name: 'طاولة مكتب',
-                    category: 'أثاث مكتبي',
-                    cost: 500,
-                    price: 750,
-                    image: ''
-                },
-                {
-                    barcode: '258369147',
-                    name: 'مصباح مكتب',
-                    category: 'إكسسوارات',
-                    cost: 40,
-                    price: 65,
-                    image: 'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=500&q=80'
-                },
-                {
-                    barcode: '369258147',
-                    name: 'تيشيرت رجالي',
-                    category: 'ملابس رجالية',
-                    cost: 40,
-                    price: 70,
-                    image: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=500&q=80'
-                },
-                {
-                    barcode: '159357486',
-                    name: 'ساعة ذكية',
-                    category: 'إكسسوارات الهواتف',
-                    cost: 200,
-                    price: 300,
-                    image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=500&q=80'
-                }
-            ];
-            
-            const transaction = db.transaction([STORE_NAME], 'readwrite');
-            const objectStore = transaction.objectStore(STORE_NAME);
-            
-            // Check if we already have items
-            const countRequest = objectStore.count();
-            
-            countRequest.onsuccess = function() {
-                if (countRequest.result === 0) {
-                    // Add sample items if database is empty
-                    sampleItems.forEach(item => {
-                        objectStore.add(item);
-                    });
-                    
-                    // Reload categories to display the sample data
-                    setTimeout(() => {
-                        loadMainCategories();
-                    }, 500);
-                }
-            };
-        }
     </script>
 </body>
 </html>

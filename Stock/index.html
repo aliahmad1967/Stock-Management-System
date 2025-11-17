@@ -361,6 +361,8 @@
                         <th>الفئة</th>
                         <th>التكلفة</th>
                         <th>السعر</th>
+                        <th>الكمية</th>
+                        <th>حد التنبيه</th>
                         <th>الربح</th>
                         <th>الإجراءات</th>
                     </tr>
@@ -407,6 +409,16 @@
                             <input type="number" id="price" class="form-control" placeholder="سعر البيع" step="0.01" min="0">
                         </div>
                     </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="quantity">الكمية في المخزون *</label>
+                            <input type="number" id="quantity" class="form-control" placeholder="الكمية المتوفرة" min="0" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="minStock">حد التنبيه الأدنى</label>
+                            <input type="number" id="minStock" class="form-control" placeholder="حد التنبيه (افتراضي 5)" min="0">
+                        </div>
+                    </div>
                     <div class="form-group">
                         <label for="image">رابط الصورة</label>
                         <input type="text" id="image" class="form-control" placeholder="رابط الصورة (اختياري)">
@@ -438,13 +450,21 @@
     </div>
 
     <script>
-        // Database setup
-        const DB_NAME = 'StockDB';
-        const DB_VERSION = 1;
-        const STORE_NAME = 'items';
+        // Database setup (مشترك مع باقي صفحات النظام)
+        const DB_NAME = 'InventorySystem';
+        const DB_VERSION = 2;
+        const STORE_NAMES = {
+            PRODUCTS: 'products',
+            BILLS: 'bills',
+            CATEGORIES: 'categories',
+            SETTINGS: 'settings',
+            BACKUPS: 'backups'
+        };
+        const STORE_NAME = STORE_NAMES.PRODUCTS;
         
         let db;
         let currentEditId = null;
+        let currentEditItem = null;
         let itemToDelete = null;
 
         // Initialize the application
@@ -464,22 +484,49 @@
             request.onsuccess = function(event) {
                 db = event.target.result;
                 loadItems();
+                addSampleData();
             };
             
             request.onupgradeneeded = function(event) {
                 const db = event.target.result;
-                
-                // Create object store if it doesn't exist
-                if (!db.objectStoreNames.contains(STORE_NAME)) {
-                    const objectStore = db.createObjectStore(STORE_NAME, { 
-                        keyPath: 'id', 
-                        autoIncrement: true 
+
+                if (!db.objectStoreNames.contains(STORE_NAMES.PRODUCTS)) {
+                    const store = db.createObjectStore(STORE_NAMES.PRODUCTS, {
+                        keyPath: 'id',
+                        autoIncrement: true
                     });
-                    
-                    // Create indexes for searching
-                    objectStore.createIndex('name', 'name', { unique: false });
-                    objectStore.createIndex('barcode', 'barcode', { unique: false });
-                    objectStore.createIndex('category', 'category', { unique: false });
+                    store.createIndex('name', 'name', { unique: false });
+                    store.createIndex('barcode', 'barcode', { unique: true });
+                    store.createIndex('category', 'category', { unique: false });
+                }
+
+                if (!db.objectStoreNames.contains(STORE_NAMES.BILLS)) {
+                    const store = db.createObjectStore(STORE_NAMES.BILLS, {
+                        keyPath: 'id',
+                        autoIncrement: true
+                    });
+                    store.createIndex('date', 'date', { unique: false });
+                    store.createIndex('number', 'number', { unique: true });
+                }
+
+                if (!db.objectStoreNames.contains(STORE_NAMES.CATEGORIES)) {
+                    const store = db.createObjectStore(STORE_NAMES.CATEGORIES, {
+                        keyPath: 'id',
+                        autoIncrement: true
+                    });
+                    store.createIndex('name', 'name', { unique: true });
+                }
+
+                if (!db.objectStoreNames.contains(STORE_NAMES.SETTINGS)) {
+                    db.createObjectStore(STORE_NAMES.SETTINGS, { keyPath: 'key' });
+                }
+
+                if (!db.objectStoreNames.contains(STORE_NAMES.BACKUPS)) {
+                    const store = db.createObjectStore(STORE_NAMES.BACKUPS, {
+                        keyPath: 'id',
+                        autoIncrement: true
+                    });
+                    store.createIndex('date', 'date', { unique: false });
                 }
             };
         }
@@ -519,6 +566,7 @@
         // Open modal for adding new item
         function openAddModal() {
             currentEditId = null;
+            currentEditItem = null;
             document.getElementById('modalTitle').textContent = 'إضافة منتج جديد';
             document.getElementById('itemForm').reset();
             document.getElementById('itemModal').style.display = 'flex';
@@ -528,6 +576,7 @@
         function closeModal() {
             document.getElementById('itemModal').style.display = 'none';
             currentEditId = null;
+            currentEditItem = null;
         }
 
         // Close delete confirmation modal
@@ -553,7 +602,10 @@
                 cost: parseFloat(document.getElementById('cost').value) || 0,
                 price: parseFloat(document.getElementById('price').value) || 0,
                 image: document.getElementById('image').value,
-                createdAt: new Date()
+                quantity: parseInt(document.getElementById('quantity').value, 10) || 0,
+                minStock: parseInt(document.getElementById('minStock').value, 10) || 5,
+                createdAt: currentEditItem && currentEditItem.createdAt ? currentEditItem.createdAt : new Date(),
+                updatedAt: new Date()
             };
             
             const transaction = db.transaction([STORE_NAME], 'readwrite');
@@ -641,6 +693,8 @@
                     <td>${item.category || '---'}</td>
                     <td>${item.cost ? item.cost.toFixed(2) : '0.00'} د.ع</td>
                     <td>${item.price ? item.price.toFixed(2) : '0.00'} د.ع</td>
+                    <td>${typeof item.quantity === 'number' ? item.quantity : 0}</td>
+                    <td>${typeof item.minStock === 'number' ? item.minStock : 5}</td>
                     <td class="${profitClass}">${profitText} د.ع</td>
                     <td>
                         <div class="action-buttons">
@@ -683,12 +737,15 @@
                 const item = event.target.result;
                 if (item) {
                     currentEditId = id;
+                    currentEditItem = item;
                     document.getElementById('modalTitle').textContent = 'تعديل المنتج';
                     document.getElementById('barcode').value = item.barcode || '';
                     document.getElementById('name').value = item.name;
                     document.getElementById('category').value = item.category || '';
                     document.getElementById('cost').value = item.cost || '';
                     document.getElementById('price').value = item.price || '';
+                    document.getElementById('quantity').value = typeof item.quantity === 'number' ? item.quantity : 0;
+                    document.getElementById('minStock').value = typeof item.minStock === 'number' ? item.minStock : 5;
                     document.getElementById('image').value = item.image || '';
                     document.getElementById('itemModal').style.display = 'flex';
                 }
@@ -777,6 +834,8 @@
                     category: 'إلكترونيات',
                     cost: 2500,
                     price: 3200,
+                    quantity: 15,
+                    minStock: 5,
                     image: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=500&q=80',
                     createdAt: new Date()
                 },
@@ -786,6 +845,8 @@
                     category: 'إلكترونيات',
                     cost: 1800,
                     price: 2200,
+                    quantity: 8,
+                    minStock: 3,
                     image: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=500&q=80',
                     createdAt: new Date()
                 },
@@ -795,6 +856,8 @@
                     category: 'معدات مكتبية',
                     cost: 800,
                     price: 1100,
+                    quantity: 5,
+                    minStock: 2,
                     image: '',
                     createdAt: new Date()
                 }
@@ -821,38 +884,6 @@
             };
         }
 
-        // Call addSampleData after database is initialized
-        const originalOnSuccess = initializeDB;
-        initializeDB = function() {
-            const request = indexedDB.open(DB_NAME, DB_VERSION);
-            
-            request.onerror = function(event) {
-                console.error('فشل في فتح قاعدة البيانات:', event.target.error);
-            };
-            
-            request.onsuccess = function(event) {
-                db = event.target.result;
-                loadItems();
-                addSampleData();
-            };
-            
-            request.onupgradeneeded = function(event) {
-                const db = event.target.result;
-                
-                // Create object store if it doesn't exist
-                if (!db.objectStoreNames.contains(STORE_NAME)) {
-                    const objectStore = db.createObjectStore(STORE_NAME, { 
-                        keyPath: 'id', 
-                        autoIncrement: true 
-                    });
-                    
-                    // Create indexes for searching
-                    objectStore.createIndex('name', 'name', { unique: false });
-                    objectStore.createIndex('barcode', 'barcode', { unique: false });
-                    objectStore.createIndex('category', 'category', { unique: false });
-                }
-            };
-        };
     </script>
 </body>
 </html>

@@ -670,10 +670,17 @@
     </div>
 
     <script>
-        // Database setup
-        const DB_NAME = 'StockDB';
-        const DB_VERSION = 1;
-        const BILLS_STORE_NAME = 'bills';
+        // Database setup (مشترك مع بقية الصفحات)
+        const DB_NAME = 'InventorySystem';
+        const DB_VERSION = 2;
+        const STORE_NAMES = {
+            PRODUCTS: 'products',
+            BILLS: 'bills',
+            CATEGORIES: 'categories',
+            SETTINGS: 'settings',
+            BACKUPS: 'backups'
+        };
+        const BILLS_STORE_NAME = STORE_NAMES.BILLS;
 
         let db;
         let allBills = [];
@@ -702,14 +709,43 @@
             request.onupgradeneeded = function (event) {
                 const db = event.target.result;
 
-                // Create bills store if it doesn't exist
-                if (!db.objectStoreNames.contains(BILLS_STORE_NAME)) {
-                    const billsStore = db.createObjectStore(BILLS_STORE_NAME, {
+                if (!db.objectStoreNames.contains(STORE_NAMES.PRODUCTS)) {
+                    const store = db.createObjectStore(STORE_NAMES.PRODUCTS, {
                         keyPath: 'id',
                         autoIncrement: true
                     });
+                    store.createIndex('name', 'name', { unique: false });
+                    store.createIndex('barcode', 'barcode', { unique: true });
+                    store.createIndex('category', 'category', { unique: false });
+                }
 
-                    billsStore.createIndex('date', 'date', { unique: false });
+                if (!db.objectStoreNames.contains(STORE_NAMES.BILLS)) {
+                    const store = db.createObjectStore(STORE_NAMES.BILLS, {
+                        keyPath: 'id',
+                        autoIncrement: true
+                    });
+                    store.createIndex('date', 'date', { unique: false });
+                    store.createIndex('number', 'number', { unique: true });
+                }
+
+                if (!db.objectStoreNames.contains(STORE_NAMES.CATEGORIES)) {
+                    const store = db.createObjectStore(STORE_NAMES.CATEGORIES, {
+                        keyPath: 'id',
+                        autoIncrement: true
+                    });
+                    store.createIndex('name', 'name', { unique: true });
+                }
+
+                if (!db.objectStoreNames.contains(STORE_NAMES.SETTINGS)) {
+                    db.createObjectStore(STORE_NAMES.SETTINGS, { keyPath: 'key' });
+                }
+
+                if (!db.objectStoreNames.contains(STORE_NAMES.BACKUPS)) {
+                    const store = db.createObjectStore(STORE_NAMES.BACKUPS, {
+                        keyPath: 'id',
+                        autoIncrement: true
+                    });
+                    store.createIndex('date', 'date', { unique: false });
                 }
             };
         }
@@ -1059,100 +1095,6 @@
             }, 3000);
         }
 
-        // Add sample data if database is empty
-        function addSampleData() {
-            const sampleBills = [
-                {
-                    number: 1001,
-                    date: new Date(),
-                    items: [
-                        { id: 1, name: 'لابتوب ديل', price: 3200, quantity: 1, total: 3200 },
-                        { id: 2, name: 'ماوس لاسلكي', price: 80, quantity: 1, total: 80 }
-                    ],
-                    subtotal: 3280,
-                    discount: 100,
-                    total: 3180,
-                    paid: 3200,
-                    balance: 20
-                },
-                {
-                    number: 1002,
-                    date: new Date(Date.now() - 86400000), // Yesterday
-                    items: [
-                        { id: 3, name: 'هاتف سامسونج', price: 2200, quantity: 1, total: 2200 },
-                        { id: 4, name: 'غطاء هاتف', price: 50, quantity: 2, total: 100 }
-                    ],
-                    subtotal: 2300,
-                    discount: 0,
-                    total: 2300,
-                    paid: 2300,
-                    balance: 0
-                },
-                {
-                    number: 1003,
-                    date: new Date(Date.now() - 172800000), // 2 days ago
-                    items: [
-                        { id: 5, name: 'طابعة كانون', price: 1100, quantity: 1, total: 1100 },
-                        { id: 6, name: 'كرسي مكتب', price: 450, quantity: 1, total: 450 },
-                        { id: 7, name: 'مصباح مكتب', price: 65, quantity: 1, total: 65 }
-                    ],
-                    subtotal: 1615,
-                    discount: 115,
-                    total: 1500,
-                    paid: 1500,
-                    balance: 0
-                }
-            ];
-
-            const transaction = db.transaction([BILLS_STORE_NAME], 'readwrite');
-            const objectStore = transaction.objectStore(BILLS_STORE_NAME);
-
-            // Check if we already have bills
-            const countRequest = objectStore.count();
-
-            countRequest.onsuccess = function () {
-                if (countRequest.result === 0) {
-                    // Add sample bills if database is empty
-                    sampleBills.forEach(bill => {
-                        objectStore.add(bill);
-                    });
-
-                    // Reload bills to display the sample data
-                    setTimeout(() => {
-                        loadBills();
-                    }, 500);
-                }
-            };
-        }
-
-        // Call addSampleData after database is initialized
-        const originalOnSuccess = initializeDB;
-        initializeDB = function () {
-            const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-            request.onerror = function (event) {
-                console.error('فشل في فتح قاعدة البيانات:', event.target.error);
-            };
-
-            request.onsuccess = function (event) {
-                db = event.target.result;
-                addSampleData();
-            };
-
-            request.onupgradeneeded = function (event) {
-                const db = event.target.result;
-
-                // Create bills store if it doesn't exist
-                if (!db.objectStoreNames.contains(BILLS_STORE_NAME)) {
-                    const billsStore = db.createObjectStore(BILLS_STORE_NAME, {
-                        keyPath: 'id',
-                        autoIncrement: true
-                    });
-
-                    billsStore.createIndex('date', 'date', { unique: false });
-                }
-            };
-        };
     </script>
 </body>
 
