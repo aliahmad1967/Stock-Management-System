@@ -743,6 +743,10 @@
                         <i class="fas fa-save"></i>
                         نسخ احتياطي
                     </a>
+                    <a href="#" class="btn" id="selectFolderBtn" style="margin-top: 12px; background: rgba(255,255,255,0.15);">
+                        <i class="fas fa-folder-open"></i>
+                        تعيين مجلد التخزين
+                    </a>
                 </div>
             </div>
     </section>
@@ -854,6 +858,7 @@
         };
 
         let db;
+        let backupDirectoryHandle = null;
 
         // Initialize the application
         document.addEventListener('DOMContentLoaded', function() {
@@ -876,6 +881,7 @@
             request.onsuccess = function(event) {
                 db = event.target.result;
                 console.log('تم فتح قاعدة البيانات بنجاح');
+                loadBackupDirectoryHandle();
                 updateDashboardStats();
                 checkSystemStatus();
                 addSampleData();
@@ -933,6 +939,7 @@
         function setupEventListeners() {
             // Backup button
             document.getElementById('backupBtn').addEventListener('click', createBackup);
+            document.getElementById('selectFolderBtn').addEventListener('click', selectBackupFolder);
         }
 
         // Quick actions button handlers
@@ -1152,17 +1159,27 @@
                     request.onerror = () => reject(request.error);
                 });
 
-                // Download as JSON file
                 const dataStr = JSON.stringify(backupData, null, 2);
-                const dataBlob = new Blob([dataStr], { type: 'application/json' });
-                const url = URL.createObjectURL(dataBlob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `backup-${new Date().toISOString().split('T')[0]}.json`;
-                link.click();
-                URL.revokeObjectURL(url);
+                const baseName = `backup-${new Date().toISOString().split('T')[0]}`;
+                const fileName = `${baseName}.json`;
+                let savedToFolder = false;
 
-                showNotification('تم إنشاء النسخ الاحتياطي بنجاح', 'success');
+                if (!backupDirectoryHandle && window.showDirectoryPicker) {
+                    await selectBackupFolder();
+                }
+
+                if (backupDirectoryHandle) {
+                    savedToFolder = await saveBackupToFolder(dataStr, fileName);
+                }
+
+                if (!savedToFolder) {
+                    downloadFile(dataStr, fileName, 'application/json');
+                    showNotification('تم تنزيل النسخة الاحتياطية على جهازك', 'success');
+                } else {
+                    showNotification('تم حفظ النسخة الاحتياطية داخل المجلد المحدد', 'success');
+                }
+
+                await createCsvExports(backupData, baseName, savedToFolder);
                 checkSystemStatus();
 
             } catch (error) {
@@ -1200,6 +1217,144 @@
                 request.onsuccess = () => resolve(request.result);
                 request.onerror = () => reject(request.error);
             });
+        }
+
+        // Settings helpers
+        function saveSetting(key, value) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction([STORE_NAMES.SETTINGS], 'readwrite');
+                const store = transaction.objectStore(STORE_NAMES.SETTINGS);
+                const request = store.put({ key, value });
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        function getSetting(key) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction([STORE_NAMES.SETTINGS], 'readonly');
+                const store = transaction.objectStore(STORE_NAMES.SETTINGS);
+                const request = store.get(key);
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        async function loadBackupDirectoryHandle() {
+            try {
+                const setting = await getSetting('backupDirectoryHandle');
+                if (setting && setting.value) {
+                    backupDirectoryHandle = setting.value;
+                }
+            } catch (error) {
+                console.warn('تعذر تحميل مرجع مجلد النسخ الاحتياطي:', error);
+            }
+        }
+
+        async function selectBackupFolder(event) {
+            if (event) event.preventDefault();
+            if (!window.showDirectoryPicker) {
+                showNotification('متصفحك لا يدعم اختيار المجلدات. استخدم Chrome أو Edge حديث.', 'error');
+                return null;
+            }
+
+            try {
+                const rootHandle = await window.showDirectoryPicker();
+                if (!(await ensureDirectoryPermission(rootHandle))) {
+                    showNotification('يجب منح صلاحية الكتابة على المجلد المحدد.', 'error');
+                    return null;
+                }
+
+                const folderHandle = await rootHandle.getDirectoryHandle('InventorySystemData', { create: true });
+                backupDirectoryHandle = folderHandle;
+                await saveSetting('backupDirectoryHandle', folderHandle);
+                showNotification('تم تعيين مجلد التخزين بنجاح', 'success');
+                return folderHandle;
+            } catch (error) {
+                if (error.name !== 'AbortError') {
+                    console.error('Error selecting backup folder:', error);
+                    showNotification('تعذر تعيين مجلد التخزين', 'error');
+                }
+                return null;
+            }
+        }
+
+        async function ensureDirectoryPermission(handle) {
+            if (!handle || !handle.queryPermission) return true;
+            let permission = await handle.queryPermission({ mode: 'readwrite' });
+            if (permission === 'granted') return true;
+            if (permission === 'denied') return false;
+            permission = await handle.requestPermission({ mode: 'readwrite' });
+            return permission === 'granted';
+        }
+
+        async function ensureBackupDirectoryPermission() {
+            if (!backupDirectoryHandle) return false;
+            return ensureDirectoryPermission(backupDirectoryHandle);
+        }
+
+        async function saveBackupToFolder(dataStr, fileName) {
+            try {
+                if (!(await ensureBackupDirectoryPermission())) {
+                    return false;
+                }
+
+                const fileHandle = await backupDirectoryHandle.getFileHandle(fileName, { create: true });
+                const writable = await fileHandle.createWritable();
+                await writable.write(dataStr);
+                await writable.close();
+                return true;
+            } catch (error) {
+                console.error('Error saving backup to folder:', error);
+                return false;
+            }
+        }
+
+        async function createCsvExports(backupData, baseName, hasFolder) {
+            const dataSets = [
+                { key: 'products', data: backupData.products },
+                { key: 'bills', data: backupData.bills },
+                { key: 'categories', data: backupData.categories }
+            ];
+
+            for (const set of dataSets) {
+                if (!Array.isArray(set.data) || set.data.length === 0) continue;
+                const csv = convertArrayToCsv(set.data);
+                const fileName = `${baseName}-${set.key}.csv`;
+
+                if (hasFolder && backupDirectoryHandle) {
+                    await saveBackupToFolder(csv, fileName);
+                } else {
+                    downloadFile(csv, fileName, 'text/csv');
+                }
+            }
+        }
+
+        function convertArrayToCsv(arr) {
+            if (!arr || arr.length === 0) return '';
+            const keys = Array.from(new Set(arr.flatMap(obj => Object.keys(obj))));
+            const escapeValue = (value) => {
+                if (value === undefined || value === null) return '';
+                const str = typeof value === 'object' ? JSON.stringify(value) : String(value);
+                if (/[",\n]/.test(str)) {
+                    return `"${str.replace(/"/g, '""')}"`;
+                }
+                return str;
+            };
+
+            const header = keys.join(',');
+            const rows = arr.map(item => keys.map(key => escapeValue(item[key])).join(','));
+            return [header, ...rows].join('\n');
+        }
+
+        function downloadFile(content, fileName, mimeType) {
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            link.click();
+            URL.revokeObjectURL(url);
         }
 
         // Show notification
